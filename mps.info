@@ -1,0 +1,10 @@
+name = MPS Integration
+description = Provides integration with Master Page Service.
+files[] = mps.class.php
+files[] = b64.class.php
+scripts[] = mps.js
+stylesheets[all][] = mps.css
+dependencies[] = token
+configure = admin/config/services/mps
+package = iVillage
+core = 7.x

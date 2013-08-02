@@ -1,0 +1,328 @@
+<?php
+
+/*
+ * @file MPS Integration
+ */
+
+define('MPS_DEFAULT_BASE_URL', 'http://mps.den1.ivillage.com/');
+define('MPS_DEFAULT_XML_API_PATH', 'request/page/xml');
+define('MPS_DEFAULT_JSON_API_PATH', 'request/page/json');
+define('MPS_DEFAULT_API_DESCRIPTOR', 'request/describe');
+define('MPS_DEFAULT_SITE_ID', 'ivillage-web');
+define('MPS_DEFAULT_EXCLUDE_PATHS', "admin\nadmin/*");
+
+/**
+ * Implements hook_init().
+ */
+function mps_init() {
+  $mps = mps_get_manager_class();
+
+  $data = array(
+    'path' => drupal_strtolower(drupal_get_path_alias($_GET['q'])),
+  );
+
+  // TODO - this needs expanding upon.
+  $object = menu_get_object(arg(0));
+  if (isset($object->nid)) {
+    $data['nid'] = $object->nid;
+  }
+  else if (isset($object->tid)) {
+    $data['tid'] = $object->tid;
+  }
+  if ($_SERVER['QUERY_STRING']) {
+    $data['query'] = $_SERVER['QUERY_STRING'];
+  }
+  if (mps_in_debug_mode()) {
+    $data['debug'] = TRUE;
+  }
+
+  drupal_add_js(array('mps' => $data), 'setting');
+}
+
+/**
+ * Implements hook_menu().
+ */
+function mps_menu() {
+  $items['admin/config/services/mps'] = array(
+    'title' => 'MPS integration',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('mps_admin_settings'),
+    'access arguments' => array('administer mps'),
+    'file' => 'mps.admin.inc',
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['mps'] = array(
+    'page callback' => 'mps_async_request',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_block().
+ */
+function mps_block_info() {
+  $mps = mps_get_manager_class();
+  $blocks = array();
+
+  foreach ($mps->getAdUnitRegions() as $key => $title) {
+    // This example comes from node.module.
+    $blocks['mps_ad_' . $key] = array(
+      'info' => t('MPS "!title" Ad Unit', array('!title' => $title)),
+      'cache' => DRUPAL_NO_CACHE,
+    );
+  }
+
+  foreach ($mps->getPageComponents() as $key => $title) {
+    // This example comes from node.module.
+    $blocks['mps_comp_' . $key] = array(
+      'info' => t('MPS "!title" Widget', array('!title' => $title)),
+      'cache' => DRUPAL_NO_CACHE,
+    );
+  }
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ *
+ * Outputting placeholder divs for ad units, components.
+ */
+function mps_block_view($delta) {
+  $parts = preg_split('/(mps)_(ad|comp)_(.*)/', $delta, -1,  PREG_SPLIT_DELIM_CAPTURE );
+
+  if ($parts[1] == 'mps') {
+    $classes = array('mps-placeholder');
+    if ($parts[2] == 'ad') {
+        $classes[] = 'mps-adunit';
+    }
+    else if ($parts[2] == 'comp') {
+        $classes[] = 'mps-component';
+    }
+    else {
+        $classes[] = 'mps-' . $parts[2];
+    }
+    return array('content' => '<div class="'. implode(' ', $classes) . '" id="mps-' . drupal_clean_css_identifier($parts[3]) . '" ></div>');
+  }
+}
+
+/**
+ * Implements hook_perm().
+ */
+function mps_perm() {
+  return array('administer mps');
+}
+
+/**
+ * Callback for /mps
+ */
+function mps_async_request($path = NULL, $output = TRUE) {
+  if ($path === NULL) {
+    $params = $_POST;
+  }
+  else {
+    $params['path'] = $path;
+  }
+
+  $params['path'] = ($params['path'] == variable_get('site_frontpage', 'node')) ? '' : trim($params['path'], '/');
+
+  if ($params['path']) {
+    menu_set_active_item(drupal_get_normal_path($params['path']));
+  }
+  else {
+    menu_set_active_item(drupal_get_normal_path(variable_get('site_frontpage', 'node')));
+  }
+  if (drupal_is_front_page()) {
+    $params['path'] = '';
+  }
+
+  $mps = mps_get_manager_class();
+
+  $request = $mps->buildRequest($params);
+  drupal_alter('mps_request', $request, $mps);
+
+  $response = $mps->executeRequest($request);
+
+  if ($response->code && $response->code < 300) {
+    $decoded = drupal_json_decode($response->data);
+    $valid_json_response = (json_last_error() == JSON_ERROR_NONE);
+
+    $response = array(
+      'success' => TRUE,
+      'data' => $valid_json_response ? $decoded : $response->data,
+      'request_url' => $response->request_url,
+      'context' => $_POST['lastContext'],
+    );
+    if (mps_in_debug_mode()) {
+      $response['debug'] = TRUE;
+    }
+
+    drupal_alter('mps_response', $response, $mps);
+
+    if ($output) {
+      drupal_json_output($response);
+      drupal_exit();
+    }
+    else {
+      return $response;
+    }
+  }
+  else {
+    watchdog('mps', 'MPS call failed (code @code): @request', array('@code' => $response->code, '@request' => $response->request));
+    if ($output) {
+      $response = array(
+        'success' => FALSE,
+        'code' => $response->code,
+        'request_url' =>  $response->request_url,
+      );
+      if (mps_in_debug_mode()) {
+        $response['debug'] = TRUE;
+      }
+      drupal_json_output($response);
+      drupal_exit();
+    }
+  }
+
+  return $response;
+}
+
+/**
+ * Implements hook_mps_request_alter().
+ */
+function mps_mps_request_alter(&$request, $mps) {
+  // This becomes true further down if we're looking at content.
+  $request['data']['is_content'] = 0;
+
+  if ($request['data']['path'] == '/' . variable_get('site_frontpage', 'node')) {
+    $request['data']['path'] = '/';
+  }
+  if ($_POST['query']) {
+    $request['data']['qs'] = b64_Core::encode($_POST['query']);
+  }
+
+  // If the cat mapping already has pipes in it, assume that we don't need to
+  // explode it from a comma-delimited list.
+  if (!strpos($request['data']['cat'], '|')) {
+    // Categories.  Taking a comma delimited token value of a hierarchical
+    // taxonomy term, flip it around and replace the comma delimiters with
+    // pipes.
+    $cats = array_reverse(explode(',', $request['data']['cat']));
+    if ($cats) {
+      $request['data']['cat'] = implode('|', array_map('trim', $cats));
+    }
+  }
+
+  // Next, build the Content Affinity Groups (cag).
+  $object = menu_get_object(arg(0));
+  if (isset($object->nid)) {
+    $request['data']['is_content'] = 1;
+    if ($cags = _mps_extract_cag_array($object)) {
+      $request['data']['cag'] = $cags;
+    }
+  }
+  elseif (isset($object->tid)) {
+    // wat do for taxonomy terms?
+  }
+
+  // For non-content pages, content_id becomes a hash of the site and path.
+  if (!$request['data']['is_content']) {
+    $request['data']['content_id'] = MPS::generateContentIdentifier($request['data']['site'], $request['data']['path']);
+  }
+
+  // Declare to MPS which adunits we are requesting.
+  if (!empty($_POST['lastContext']['adunits'])) {
+    $request['data']['adunits'] = implode('|',$_POST['lastContext']['adunits']);
+  }
+}
+
+/**
+ * For building the cag[] array, this takes an entity bundle and for each
+ * term_reference field, gathers those values into a | escaped list, keyed by
+ * taxonomy vocabularies.
+ */
+function _mps_extract_cag_array($object) {
+  $fields = field_info_instances('node', $object->type);
+  $cags = array();
+  foreach ($fields as $field_name => $field_instance) {
+    $field_info = field_info_field($field_name);
+    if ($field_info['type'] == 'taxonomy_term_reference') {
+      $lang = isset($object->language) ? $object->language : 'und';
+      foreach ($object as $object_key => $object_key_value) {
+        if ($object_key == $field_name) {
+          foreach ($object_key_value[$lang] as $field_value) {
+            if (isset($field_value['tid'])) {
+              $tid = $field_value['tid'];
+              $terms = taxonomy_get_parents_all($tid);
+              foreach ($terms as $term) {
+                $vocab = $term->vocabulary_machine_name;
+                $cags[MPS::formatCagKey($vocab)][] = $term->name;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  foreach ($cags as $key => $contents) {
+    $cags[$key] = implode('|', array_reverse($contents));
+  }
+  return $cags;
+}
+
+/**
+ * Returns MPS management object.
+ */
+function mps_get_manager_class() {
+  $object = &drupal_static(__FUNCTION__);
+  if (empty($object)) {
+    $object = new MPS();
+  }
+  return $object;
+}
+
+/**
+ * Fires a request to the MPS service.
+ */
+function mps_catch_page_request() {
+  mps_get_manager_class();
+}
+
+/**
+ * Returns a parameter mapping default.
+ */
+function mps_get_mapping_default($key, $default = NULL) {
+  $defaults = variable_get('mps_mapping_defaults', array());
+  return isset($defaults[$key]) ? $defaults[$key] : $default;
+}
+
+/**
+ * Returns TRUE if $path matches anything in the exclude list.
+ */
+function mps_path_is_excluded($path = NULL) {
+  // Convert path to lowercase. This allows comparison of the same path
+  // with different case. Ex: /Page, /page, /PAGE.
+  $pages = drupal_strtolower(variable_get('mps_exclude_paths', MPS_DEFAULT_EXCLUDE_PATHS));
+
+  $path = empty($path) ? $_GET['q'] : $path;
+
+  // Convert the Drupal path to lowercase.
+  $path = drupal_strtolower(drupal_get_path_alias($path));
+
+  // Compare the lowercase internal and lowercase path alias (if any).
+  $page_match = drupal_match_path($path, $pages);
+  if ($path != $_GET['q']) {
+    $page_match = $page_match || drupal_match_path($_GET['q'], $pages);
+  }
+
+  return $page_match;
+}
+
+/**
+ * Is MPS in debug mode?
+ */
+function mps_in_debug_mode() {
+  return (variable_get('mps_debug', 0) && (user_access('administer mps') || user_access('access devel information')));
+}
