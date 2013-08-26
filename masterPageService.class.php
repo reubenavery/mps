@@ -1,14 +1,18 @@
 <?php
 
-/*
- * @file Master Page Service manager class.
+/**
+ * @file
+ * Master Page Service manager class.
  */
 
-class MPS {
-  protected $mps_base_url;
+class MasterPageService {
+  protected $baseUrl;
 
-  function __construct() {
-    $this->mps_base_url = variable_get('mps_base_url', MPS_DEFAULT_BASE_URL);
+  /**
+   * MPS Constructor.
+   */
+  public function __construct() {
+    $this->baseUrl = variable_get('mps_base_url', MPS_DEFAULT_BASE_URL);
 
     return $this;
   }
@@ -16,11 +20,11 @@ class MPS {
   /**
    * Constructs the request.
    */
-  function buildRequest($params) {
+  public function buildRequest($params) {
     global $user;
 
     $request = array(
-      'url' => $this->mps_base_url . MPS_DEFAULT_JSON_API_PATH,
+      'url' => $this->baseUrl . MPS_DEFAULT_JSON_API_PATH,
       'data' => array(),
     );
 
@@ -34,11 +38,11 @@ class MPS {
     // array.  Pass each default through the token filter, providing a node
     // or taxonomy object (depending) and a user object.
     foreach ($defaults as $key => $value) {
-      $data =  array('user' => $user);
+      $data = array('user' => $user);
       if (isset($object->nid)) {
         $data['node'] = $object;
       }
-      else if (isset($object->tid)) {
+      elseif (isset($object->tid)) {
         $data['term'] = $object;
       }
       if ($replaced = token_replace($value, $data, array('clear' => TRUE))) {
@@ -50,9 +54,9 @@ class MPS {
   }
 
   /**
-   * Executes request to MPS
+   * Executes a request to MasterPageService.
    */
-  function executeRequest($request) {
+  public function executeRequest($request) {
     $url = url($request['url'], array('query' => $request['data']));
     $response = drupal_http_request($url);
     $response->request_url = $url;
@@ -60,7 +64,7 @@ class MPS {
   }
 
   /**
-   * Retrieve the configured available adunit regions from MPS.
+   * Retrieve the configured available adunit regions from MasterPageService.
    */
   public function getAdUnitRegions() {
     $cid = 'mps_adunit_regions';
@@ -71,6 +75,7 @@ class MPS {
     }
     else {
       $descr = $this->getServiceDescription();
+      $blocks = array();
       foreach ($descr['adunits'] as $key) {
         $blocks[$this->cleanComponentIdentifier($key)] = $key;
       }
@@ -93,6 +98,7 @@ class MPS {
     }
     else {
       $descr = $this->getServiceDescription();
+      $blocks = array();
       foreach ($descr['components'] as $key) {
         $blocks[$this->cleanComponentIdentifier($key)] = $key;
       }
@@ -107,7 +113,8 @@ class MPS {
    * Scrub component IDs of strange unwanted characters.
    */
   protected function cleanComponentIdentifier($identifier) {
-    return drupal_clean_css_identifier($identifier, $filter = array(' ' => '_', '_' => '_', '/' => '_', '[' => '', ']' => ''));
+    $filters = array(' ' => '_', '_' => '_', '/' => '_', '[' => '', ']' => '');
+    return drupal_clean_css_identifier($identifier, $filter = $filters);
   }
 
   /**
@@ -117,24 +124,24 @@ class MPS {
     $description = &drupal_static(__FUNCTION__);
 
     if (empty($description)) {
-      $url = $this->mps_base_url . variable_get('mps_api_descriptor', MPS_DEFAULT_API_DESCRIPTOR) . '/'. mps_get_mapping_default('site', MPS_DEFAULT_SITE_ID);
+      $url = $this->baseUrl . variable_get('mps_api_descriptor', MPS_DEFAULT_API_DESCRIPTOR) . '/' . mps_get_mapping_default('site', MPS_DEFAULT_SITE_ID);
       if (!valid_url($url, TRUE)) {
-        watchdog('MPS', 'Bad service URL: %url', array('%url', $url), WATCHDOG_ERROR);
+        watchdog('MasterPageService', 'Bad service URL: %url', array('%url', $url), WATCHDOG_ERROR);
         if ($this->inDebugMode()) {
-          drupal_set_message('MPS Bad descriptor url: '. $url, 'error');
+          drupal_set_message('MasterPageService Bad descriptor url: ' . $url, 'error');
         }
       }
       if ($this->inDebugMode()) {
-        drupal_set_message('MPS Descriptor call to '. $url);
+        drupal_set_message('MasterPageService Descriptor call to ' . $url);
       }
       $response = drupal_http_request($url);
       if (isset($response->data)) {
-       $description = drupal_json_decode($response->data);
+        $description = drupal_json_decode($response->data);
       }
       else {
-        watchdog('MPS', 'Couldnt get site description from MPS', array(), WATCHDOG_ERROR);
+        watchdog('MasterPageService', 'Couldnt get site description from MasterPageService', array(), WATCHDOG_ERROR);
         if ($this->inDebugMode()) {
-          drupal_set_message('MPS didnt return any data from its descriptor service.', 'error');
+          drupal_set_message('MasterPageService didnt return any data from its descriptor service.', 'error');
         }
       }
     }
@@ -143,39 +150,47 @@ class MPS {
   }
 
   /**
-   * Checks to see if a page path has been designated as excluded from MPS
-   * processing.
+   * Checks to see if a path has been excluded from MPS processing.
    */
   public function isExcludedFor($path = NULL) {
     return mps_path_is_excluded($path);
   }
 
   /**
-   * Checks to see if MPS is in debug mode.
+   * Checks to see if MasterPageService is in debug mode.
    */
   protected function inDebugMode() {
     return mps_in_debug_mode();
   }
 
-  //
-  // From Rich Rhee via http://pastebin.com/Fp2fuPbm:
-  //
+  /*
+   * From Rich Rhee via http://pastebin.com/Fp2fuPbm:
+   */
 
+  /**
+   * Formats a key for the CAG parameter array.
+   */
   public static function formatCagKey($string) {
-    # Make lowercase
+    // Make lowercase.
     $string = strtolower($string);
-    # Replace spaces with underscores or else MPS will throw an error
-    $string = str_replace(' ','_',$string);
+    // Replace spaces with underscores or else MPS will throw an error.
+    $string = str_replace(' ', '_', $string);
     preg_replace("/[^0-9a-zA-Z_-\s\.]/", '', $string);
     return $string;
   }
 
+  /**
+   * Cleans a string for some reason.
+   */
   public static function makeCleanString($string) {
-    return preg_replace("/[^0-9a-zA-Z_-\s\.]/", '', strip_tags(urldecode(htmlspecialchars_decode(html_entity_decode($string),ENT_QUOTES))));
+    return preg_replace("/[^0-9a-zA-Z_-\s\.]/", '', strip_tags(urldecode(htmlspecialchars_decode(html_entity_decode($string), ENT_QUOTES))));
   }
 
-  public static function generateContentIdentifier($site,$path) {
-    $generated_id = 'X'.(hexdec(substr(sha1($site.'|'.$path), 0, 15)) % 4294967295);
+  /**
+   * Generates a unique identifier based on MPS site and path params.
+   */
+  public static function generateContentIdentifier($site, $path) {
+    $generated_id = 'X' . (hexdec(substr(sha1($site . '|' . $path), 0, 15)) % 4294967295);
     return $generated_id;
   }
 }

@@ -1,11 +1,12 @@
 <?php
 
-/*
- * @file Admin settings pages for MPS
+/**
+ * @file
+ * Admin settings pages for MasterPageService
  */
 
 /**
- * MPS administrative settings form.
+ * MasterPageService administrative settings form.
  */
 function mps_admin_settings() {
   $form['mps_base_url'] = array(
@@ -16,10 +17,16 @@ function mps_admin_settings() {
     '#required' => TRUE,
   );
 
+  $t_str = "Specify pages by using their paths. Enter one path per line. The '*' character is a wildcard. Example paths are %blog for the blog page and %blog-wildcard for every personal blog. %front is the front page.";
+  $t_args = array(
+    '%blog' => 'blog',
+    '%blog-wildcard' => 'blog/*',
+    '%front' => '<front>',
+  );
   $form['mps_exclude_paths'] = array(
     '#type' => 'textarea',
-    '#title' => t('Pages to exclude from MPS processing'),
-    '#description' => t("Specify pages by using their paths. Enter one path per line. The '*' character is a wildcard. Example paths are %blog for the blog page and %blog-wildcard for every personal blog. %front is the front page.", array('%blog' => 'blog', '%blog-wildcard' => 'blog/*', '%front' => '<front>')),
+    '#title' => t('Pages to exclude from MasterPageService processing'),
+    '#description' => t($t_str, $t_args),
     '#default_value' => variable_get('mps_exclude_paths', MPS_DEFAULT_EXCLUDE_PATHS),
   );
 
@@ -30,7 +37,7 @@ function mps_admin_settings() {
     '#tree' => TRUE,
   );
 
-  // The only required fields: site and path
+  // The only required fields: site and path.
   $form['mps_mapping_defaults']['site'] = array(
     '#type' => 'textfield',
     '#title' => 'Site ID [site]',
@@ -46,7 +53,7 @@ function mps_admin_settings() {
     '#required' => TRUE,
   );
 
-  // Taxonomy
+  // Taxonomy:
   $form['mps_mapping_defaults']['cat'] = array(
     '#type' => 'textfield',
     '#title' => 'Category [cat]',
@@ -60,17 +67,7 @@ function mps_admin_settings() {
     '#default_value' => mps_get_mapping_default('pkgid'),
   );
 
-  // Pass cag values silently.  Basically all taxonomy vocabularies and terms
-  // for a node in the form of cag[vocab_name]=term1|term2|term3
-  //  $form['mps_mapping_defaults']['cag'] = array(
-  //    '#type' => 'textfield',
-  //    '#title' => 'Content Affinity Groups [cag]',
-  //    '#description' => t("Secondary categorization. Primary category within which content resides.  Multiple values are delimited by the '|' character."),
-  //    '#default_value' => mps_get_mapping_default('cag'),
-  //  );
-  // TODO - UI for this to selectively choose vocabularies to include.
-
-  // Content type
+  // Content type:
   $form['mps_mapping_defaults']['content_id'] = array(
     '#type' => 'textfield',
     '#title' => 'Content ID [content_id]',
@@ -89,7 +86,7 @@ function mps_admin_settings() {
     '#default_value' => mps_get_mapping_default('subtype'),
   );
 
-  // Published date
+  // Published date.
   $form['mps_mapping_defaults']['pubdate'] = array(
     '#type' => 'textfield',
     '#title' => 'Publish date [pubdate]',
@@ -97,7 +94,7 @@ function mps_admin_settings() {
     '#default_value' => mps_get_mapping_default('pubdate'),
   );
 
-  // SEO
+  // SEO fields.
   $form['mps_mapping_defaults']['title'] = array(
     '#type' => 'textfield',
     '#title' => 'Title [title]',
@@ -114,7 +111,7 @@ function mps_admin_settings() {
     '#default_value' => mps_get_mapping_default('hline'),
   );
 
-  // Search results
+  // Search results.
   $form['mps_mapping_defaults']['keywords'] = array(
     '#type' => 'textfield',
     '#title' => 'Keywords [keywords]',
@@ -144,7 +141,6 @@ function mps_admin_settings() {
   );
 
   // TODO- implement field[field_name]=value
-
   $form['mps_mapping_defaults']['token'] = array(
     '#type' => 'fieldset',
     '#collapsible' => TRUE,
@@ -152,7 +148,11 @@ function mps_admin_settings() {
     '#title' => t('Replacement values'),
   );
   $form['mps_mapping_defaults']['token']['tokens'] = array(
-    '#markup' => theme('token_tree', array('token_types' => 'all', 'click_insert' => TRUE, 'show_restricted' => TRUE)),
+    '#markup' => theme('token_tree', array(
+      'token_types' => 'all',
+      'click_insert' => TRUE,
+      'show_restricted' => TRUE,
+    )),
   );
 
   $form['mps_debug'] = array(
@@ -166,6 +166,9 @@ function mps_admin_settings() {
   return system_settings_form($form);
 }
 
+/**
+ * Setting validation callback.
+ */
 function mps_admin_settings_validate($form, &$form_state) {
   $form_state['values']['mps_mapping_defaults'] = array_filter($form_state['values']['mps_mapping_defaults']);
   cache_clear_all('mps_adunit_regions', 'cache');

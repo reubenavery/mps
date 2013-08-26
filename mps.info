@@ -1,7 +1,7 @@
-name = MPS Integration
+name = MasterPageService Integration
 description = Provides integration with Master Page Service.
-files[] = mps.class.php
-files[] = b64.class.php
+files[] = masterPageService.class.php
+files[] = mpsBase64.class.php
 scripts[] = mps.js
 stylesheets[all][] = mps.css
 dependencies[] = token

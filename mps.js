@@ -6,11 +6,11 @@
   Drupal.behaviors.mps = {
     attach: function (context, settings) {
       try {
-        console.log('MPS online!');
+        console.log('MasterPageService online!');
         var data = settings.mps;
         data.lastContext = {};
-        data.lastContext.adunits = new Array();
-        data.lastContext.components = new Array();
+        data.lastContext.adunits = [];
+        data.lastContext.components = [];
 
         // Collect any adunit placeholder block ID's in the current context.
         $(context).find('.mps-placeholder.mps-adunit').each(function() {
@@ -23,7 +23,7 @@
           data.lastContext.components.push($(this).attr('id'));
         });
 
-        // Execute an AJAX post to MPS via Drupal.
+        // Execute an AJAX post to MasterPageService via Drupal.
         $.ajax({
           url: settings.basePath + 'mps',
           type: 'POST',
@@ -76,7 +76,7 @@
               // In the response, loop through any available page component
               // blocks and replace the placeholders in the DOM with these.
               if ('components' in response.data && response.data.components.length) {
-                for (var key in response.data.components) {
+                for (key in response.data.components) {
                   if (response.data.components.hasOwnProperty(key)) {
                     if ('data' in response.data.components[key] && response.data.components[key].data.length) {
                       $('#mps-' + drupal_clean_css_identifier(key)).replaceWith(response.data.components[key].data);
@@ -95,7 +95,7 @@
         });
       }
       catch (e) {
-        console.error('MPS call error: ' + e.message);
+        console.error('MasterPageService call error: ' + e.message);
       }
     }
   }
@@ -290,6 +290,7 @@ function krsort (inputArr, sort_flags) {
     strictForIn = false,
     populateArr = {};
 
+  //noinspection FallthroughInSwitchStatementJS
   switch (sort_flags) {
     case 'SORT_STRING':
       // compare items as strings
