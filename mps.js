@@ -6,7 +6,12 @@
   Drupal.behaviors.mps = {
     attach: function (context, settings) {
       try {
-        console.log('MasterPageService online!');
+        console.log('MPS online!');
+        var debugging = ('debug' in Drupal.settings.mps && Drupal.settings.mps.debug);
+        if (debugging) {
+          console.log('MPS debug mode');
+        }
+
         var data = settings.mps;
         data.lastContext = {};
         data.lastContext.adunits = [];
@@ -23,49 +28,65 @@
           data.lastContext.components.push($(this).attr('id'));
         });
 
-        // Execute an AJAX post to MasterPageService via Drupal.
+        // Execute an AJAX post to MPS via Drupal.
         $.ajax({
           url: settings.basePath + 'mps',
           type: 'POST',
           data: data,
           success: function (response) {
+            var debugging = ('debug' in Drupal.settings.mps && Drupal.settings.mps.debug);
+            if (debugging) {
+              console.log('MPS response received');
+              console.dir(response);
+            }
+
             if ('success' in response && response.success) {
+              try {
+                // In the response, check through pageVars and for those with
+                // data, inject into DOM.
+                if ('pagevars' in response.data) {
+                  var pagevars = response.data.pagevars;
 
-              // In the response, check through pageVars and for those with
-              // data, inject into DOM.
-              if ('pagevars' in response.data) {
-                var pagevars = response.data.pagevars;
-
-                if ('insert_head' in pagevars && pagevars.insert_head.length) {
-                  $(pagevars.insert_head).appendTo('head');
+                  if ('insert_head' in pagevars && pagevars.insert_head.length) {
+                    $(pagevars.insert_head).appendTo('head');
+                  }
+                  if ('insert_bodytag' in pagevars && pagevars.insert_bodytag.length) {
+                    $(pagevars.insert_bodytag).prependTo('body');
+                  }
+                  if ('insert_bodyheader' in pagevars && pagevars.insert_bodyheader.length) {
+                    $(pagevars.insert_bodyheader).appendTo('#header');
+                  }
+                  if ('insert_bodyfooter' in pagevars && pagevars.insert_bodyfooter.length) {
+                    $(pagevars.insert_bodyfooter).appendTo('body');
+                  }
+                  if ('meta_description' in pagevars && pagevars.meta_description.length) {
+                    $("meta[name='description']").remove();
+                    $('<meta name="description" content="' + pagevars.meta_description + '" />').appendTo('head');
+                  }
+                  if ('meta_keywords' in pagevars && pagevars.meta_keywords.length) {
+                    $("meta[name='keywords']").remove();
+                    $('<meta name="keywords" content="' + pagevars.meta_keywords + '" />').appendTo('head');
+                  }
+                  if ('omniture_values' in pagevars && pagevars.omniture_values.length) {
+                    // todo
+                  }
                 }
-                if ('insert_bodytag' in pagevars && pagevars.insert_bodytag.length) {
-                  $(pagevars.insert_bodytag).prependTo('body');
-                }
-                if ('insert_bodyheader' in pagevars && pagevars.insert_bodyheader.length) {
-                  $(pagevars.insert_bodyheader).appendTo('#header');
-                }
-                if ('insert_bodyfooter' in pagevars && pagevars.insert_bodyfooter.length) {
-                  $(pagevars.insert_bodyfooter).appendTo('body');
-                }
-                if ('meta_description' in pagevars && pagevars.meta_description.length) {
-                  $("meta[name='description']").remove();
-                  $('<meta name="description" content="' + pagevars.meta_description + '" />').appendTo('head');
-                }
-                if ('meta_keywords' in pagevars && pagevars.meta_keywords.length) {
-                  $("meta[name='keywords']").remove();
-                  $('<meta name="keywords" content="' + pagevars.meta_keywords + '" />').appendTo('head');
-                }
-                if ('omniture_values' in pagevars && pagevars.omniture_values.length) {
-                  // todo
-                }
+              }
+              catch (ex) {
+                console.warn('MPS pagevars injection failure: ' + ex);
               }
 
               // In the response, loop through any available adunit blocks and
               // replace the placeholders in the DOM with these.
               if ('dart' in response.data && 'adunits' in response.data.dart) {
                 for (var key in response.data.dart.adunits) {
+                  if (debugging) {
+                    console.log('MPS injecting adunit ' + key);
+                  }
                   if (response.data.dart.adunits.hasOwnProperty(key)) {
+                    if (debugging) {
+                      console.dir(response.data.dart.adunits[key]);
+                    }
                     if ('data' in response.data.dart.adunits[key] && response.data.dart.adunits[key].data.length) {
                       $('#mps-' + drupal_clean_css_identifier(key)).replaceWith(response.data.dart.adunits[key].data);
                     }
@@ -77,7 +98,13 @@
               // blocks and replace the placeholders in the DOM with these.
               if ('components' in response.data && response.data.components.length) {
                 for (key in response.data.components) {
+                  if (debugging) {
+                    console.log('MPS injecting page component ' + key);
+                  }
                   if (response.data.components.hasOwnProperty(key)) {
+                    if (debugging) {
+                      console.dir(response.data.components[key]);
+                    }
                     if ('data' in response.data.components[key] && response.data.components[key].data.length) {
                       $('#mps-' + drupal_clean_css_identifier(key)).replaceWith(response.data.components[key].data);
                     }
@@ -95,7 +122,7 @@
         });
       }
       catch (e) {
-        console.error('MasterPageService call error: ' + e.message);
+        console.error('MPS call error: ' + e.message);
       }
     }
   }

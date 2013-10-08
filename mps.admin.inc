@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Admin settings pages for MasterPageService
+ * Admin settings pages for MPS
  */
 
 /**
- * MasterPageService administrative settings form.
+ * MPS administrative settings form.
  */
 function mps_admin_settings() {
   $form['mps_base_url'] = array(
@@ -17,16 +17,14 @@ function mps_admin_settings() {
     '#required' => TRUE,
   );
 
-  $t_str = "Specify pages by using their paths. Enter one path per line. The '*' character is a wildcard. Example paths are %blog for the blog page and %blog-wildcard for every personal blog. %front is the front page.";
-  $t_args = array(
-    '%blog' => 'blog',
-    '%blog-wildcard' => 'blog/*',
-    '%front' => '<front>',
-  );
   $form['mps_exclude_paths'] = array(
     '#type' => 'textarea',
-    '#title' => t('Pages to exclude from MasterPageService processing'),
-    '#description' => t($t_str, $t_args),
+    '#title' => t('Pages to exclude from MPS processing'),
+    '#description' => t("Specify pages by using their paths. Enter one path per line. The '*' character is a wildcard. Example paths are %blog for the blog page and %blog-wildcard for every personal blog. %front is the front page.", array(
+      '%blog' => 'blog',
+      '%blog-wildcard' => 'blog/*',
+      '%front' => '<front>',
+    )),
     '#default_value' => variable_get('mps_exclude_paths', MPS_DEFAULT_EXCLUDE_PATHS),
   );
 

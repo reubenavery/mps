@@ -2,10 +2,10 @@
 
 /**
  * @file
- * MasterPageService Integration module.
+ * MPS Integration module.
  */
 
-define('MPS_DEFAULT_BASE_URL', 'http://mps.den1.ivillage.com/');
+define('MPS_DEFAULT_BASE_URL', 'http://localhost/');
 define('MPS_DEFAULT_XML_API_PATH', 'request/page/xml');
 define('MPS_DEFAULT_JSON_API_PATH', 'request/page/json');
 define('MPS_DEFAULT_API_DESCRIPTOR', 'request/describe');
@@ -43,7 +43,7 @@ function mps_init() {
  */
 function mps_menu() {
   $items['admin/config/services/mps'] = array(
-    'title' => 'MasterPageService integration',
+    'title' => 'MPS integration',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('mps_admin_settings'),
     'access arguments' => array('administer mps'),
@@ -69,16 +69,16 @@ function mps_block_info() {
   foreach ($mps->getAdUnitRegions() as $key => $title) {
     // This example comes from node.module.
     $blocks['mps_ad_' . $key] = array(
-      'info' => t('MasterPageService "!title" Ad Unit', array('!title' => $title)),
-      'cache' => DRUPAL_NO_CACHE,
+      'info' => t('MPS "!title" Ad Unit', array('!title' => $title)),
+      'cache' => DRUPAL_CACHE_PER_PAGE,
     );
   }
 
   foreach ($mps->getPageComponents() as $key => $title) {
     // This example comes from node.module.
     $blocks['mps_comp_' . $key] = array(
-      'info' => t('MasterPageService "!title" Widget', array('!title' => $title)),
-      'cache' => DRUPAL_NO_CACHE,
+      'info' => t('MPS "!title" Widget', array('!title' => $title)),
+      'cache' => DRUPAL_CACHE_PER_PAGE,
     );
   }
 
@@ -155,7 +155,7 @@ function mps_async_request($path = NULL, $output = TRUE) {
       'success' => TRUE,
       'data' => $valid_json_response ? $decoded : $response->data,
       'request_url' => $response->request_url,
-      'context' => $_POST['lastContext'],
+      'context' => isset($_POST['lastContext']) ? $_POST['lastContext'] : '',
     );
     if (mps_in_debug_mode()) {
       $response['debug'] = TRUE;
@@ -172,7 +172,7 @@ function mps_async_request($path = NULL, $output = TRUE) {
     }
   }
   else {
-    watchdog('mps', 'MasterPageService call failed (code @code): @request', array('@code' => $response->code, '@request' => $response->request));
+    watchdog('mps', 'MPS call failed (code @code): @request', array('@code' => $response->code, '@request' => $response->request));
     if ($output) {
       $response = array(
         'success' => FALSE,
@@ -200,13 +200,13 @@ function mps_mps_request_alter(&$request) {
   if ($request['data']['path'] == '/' . variable_get('site_frontpage', 'node')) {
     $request['data']['path'] = '/';
   }
-  if ($_POST['query']) {
+  if (isset($_POST['query'])) {
     $request['data']['qs'] = MpsBase64::encode($_POST['query']);
   }
 
   // If the cat mapping already has pipes in it, assume that we don't need to
   // explode it from a comma-delimited list.
-  if (!strpos($request['data']['cat'], '|')) {
+  if (isset($request['data']['cat']) && !strpos($request['data']['cat'], '|')) {
     // Categories.  Taking a comma delimited token value of a hierarchical
     // taxonomy term, flip it around and replace the comma delimiters with
     // pipes.
@@ -233,7 +233,7 @@ function mps_mps_request_alter(&$request) {
     $request['data']['content_id'] = MasterPageService::generateContentIdentifier($request['data']['site'], $request['data']['path']);
   }
 
-  // Declare to MasterPageService which adunits we are requesting.
+  // Declare to MPS which adunits we are requesting.
   if (!empty($_POST['lastContext']['adunits'])) {
     $request['data']['adunits'] = implode('|', $_POST['lastContext']['adunits']);
   }
@@ -276,7 +276,7 @@ function _mps_extract_cag_array($object) {
 }
 
 /**
- * Returns MasterPageService management object.
+ * Returns MPS management object.
  */
 function mps_get_manager_class() {
   $object = &drupal_static(__FUNCTION__);
@@ -287,7 +287,7 @@ function mps_get_manager_class() {
 }
 
 /**
- * Fires a request to the MasterPageService service.
+ * Fires a request to the MPS service.
  */
 function mps_catch_page_request() {
   mps_get_manager_class();

@@ -30,7 +30,7 @@ class MasterPageService {
 
     $path = $params['path'] ? drupal_get_normal_path($params['path']) : variable_get('site_frontpage', 'node');
     $menu_item = menu_get_item($path);
-    $object = $menu_item['page_arguments'][0];
+    $object = isset($menu_item['page_arguments'][0]) ? $menu_item['page_arguments'][0] : new stdClass();
 
     $defaults = variable_get('mps_mapping_defaults', array());
 
@@ -54,7 +54,7 @@ class MasterPageService {
   }
 
   /**
-   * Executes a request to MasterPageService.
+   * Executes a request to MPS.
    */
   public function executeRequest($request) {
     $url = url($request['url'], array('query' => $request['data']));
@@ -64,7 +64,7 @@ class MasterPageService {
   }
 
   /**
-   * Retrieve the configured available adunit regions from MasterPageService.
+   * Retrieve the configured available adunit regions from MPS.
    */
   public function getAdUnitRegions() {
     $cid = 'mps_adunit_regions';
@@ -126,22 +126,22 @@ class MasterPageService {
     if (empty($description)) {
       $url = $this->baseUrl . variable_get('mps_api_descriptor', MPS_DEFAULT_API_DESCRIPTOR) . '/' . mps_get_mapping_default('site', MPS_DEFAULT_SITE_ID);
       if (!valid_url($url, TRUE)) {
-        watchdog('MasterPageService', 'Bad service URL: %url', array('%url', $url), WATCHDOG_ERROR);
+        watchdog('MPS', 'Bad service URL: %url', array('%url', $url), WATCHDOG_ERROR);
         if ($this->inDebugMode()) {
-          drupal_set_message('MasterPageService Bad descriptor url: ' . $url, 'error');
+          drupal_set_message('MPS Bad descriptor url: ' . $url, 'error');
         }
       }
       if ($this->inDebugMode()) {
-        drupal_set_message('MasterPageService Descriptor call to ' . $url);
+        drupal_set_message('MPS Descriptor call to ' . $url);
       }
       $response = drupal_http_request($url);
       if (isset($response->data)) {
         $description = drupal_json_decode($response->data);
       }
       else {
-        watchdog('MasterPageService', 'Couldnt get site description from MasterPageService', array(), WATCHDOG_ERROR);
+        watchdog('MPS', "Couldn't get site description from MPS", array(), WATCHDOG_ERROR);
         if ($this->inDebugMode()) {
-          drupal_set_message('MasterPageService didnt return any data from its descriptor service.', 'error');
+          drupal_set_message("MPS didn't return any data from its descriptor service.", 'error');
         }
       }
     }
@@ -157,7 +157,7 @@ class MasterPageService {
   }
 
   /**
-   * Checks to see if MasterPageService is in debug mode.
+   * Checks to see if MPS is in debug mode.
    */
   protected function inDebugMode() {
     return mps_in_debug_mode();
